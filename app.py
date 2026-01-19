@@ -5,7 +5,7 @@ import io
 # --- 页面设置 ---
 st.set_page_config(page_title="EPR 精细化核算工具", page_icon="📊", layout="wide")
 
-st.title("🌍 亚马逊 EPR 包装法申报表格生成器 (含国家列版)")
+st.title("🌍 亚马逊 EPR 包装法申报表格生成器 (中文国家版)")
 st.markdown("### 上传 CSV -> 选择国家 -> 生成【全材质细分】申报表")
 st.markdown("支持材质：纸、塑料、玻璃、铝、铁、木头、其他")
 
@@ -103,12 +103,40 @@ if uploaded_file is not None:
             }
             df_final = df_final.rename(index=row_mapping)
             
-            # 重置索引，让“申报类别”变成普通列
+            # 重置索引
             df_display = df_final.reset_index()
 
-            # --- 🔥 修改点 1：插入国家列到第一列 ---
-            # insert(插入位置索引, 列名, 值)
-            df_display.insert(0, '国家/站点 (Country)', selected_country)
+            # --- 🔥 修改点 START：添加中文国家映射 ---
+            # 定义国家代码映射字典
+            COUNTRY_MAP = {
+                'DE': '德国 (DE)',
+                'FR': '法国 (FR)',
+                'ES': '西班牙 (ES)',
+                'IT': '意大利 (IT)',
+                'GB': '英国 (GB)',
+                'UK': '英国 (UK)',
+                'PL': '波兰 (PL)',
+                'SE': '瑞典 (SE)',
+                'NL': '荷兰 (NL)',
+                'BE': '比利时 (BE)',
+                'AT': '奥地利 (AT)',
+                'US': '美国 (US)',
+                'CA': '加拿大 (CA)',
+                'JP': '日本 (JP)',
+                'AU': '澳大利亚 (AU)',
+                'AE': '阿联酋 (AE)',
+                'SA': '沙特 (SA)',
+                'SG': '新加坡 (SG)',
+                'IE': '爱尔兰 (IE)',
+                'PT': '葡萄牙 (PT)'
+            }
+            
+            # 获取中文名称，如果字典里没有，就直接显示代码
+            display_country_name = COUNTRY_MAP.get(selected_country, selected_country)
+
+            # 插入带中文的国家列
+            df_display.insert(0, '国家/站点 (Country)', display_country_name)
+            # --- 🔥 修改点 END ---
 
             # 列名映射
             col_mapping = {
@@ -127,9 +155,9 @@ if uploaded_file is not None:
 
             # 10. 展示
             st.divider()
-            st.success(f"✅ {selected_country} 站点核算完成！")
+            st.success(f"✅ {display_country_name} 站点核算完成！")
             
-            # 定义每一列的格式 (注意：国家列是字符串，不需要在这里定义格式，Streamlit会自动处理)
+            # 定义每一列的格式
             format_dict = {
                 '申报总件数 (Units)': '{:.0f}',
                 '纸质 (Paper) kg': '{:.3f}',
@@ -151,22 +179,21 @@ if uploaded_file is not None:
             # 11. 导出
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                sheet_name = f'{selected_country}_明细申报数据'
+                # 这里的 sheet 名也加上中文会更清晰
+                sheet_name = f'{selected_country}_明细数据'
                 df_display.to_excel(writer, sheet_name=sheet_name, index=False)
                 worksheet = writer.sheets[sheet_name]
                 
-                # --- 🔥 修改点 2：调整 Excel 列宽以适配新增加的一列 ---
-                # A列: 国家
-                worksheet.set_column('A:A', 15) 
-                # B列: 申报类别
+                # 调整列宽
+                worksheet.set_column('A:A', 20) # 国家列稍微宽一点，因为有中文
                 worksheet.set_column('B:B', 35) 
-                # C列到K列: 数据列
                 worksheet.set_column('C:K', 15) 
 
-            file_name = f"{selected_country}_包装法_明细申报表.xlsx"
+            # 文件名也用中文显示
+            file_name = f"{display_country_name}_包装法_明细申报表.xlsx"
             
             st.download_button(
-                label=f"📥 下载明细表格 ({selected_country})",
+                label=f"📥 下载表格: {file_name}",
                 data=buffer.getvalue(),
                 file_name=file_name,
                 mime="application/vnd.ms-excel"
@@ -174,7 +201,6 @@ if uploaded_file is not None:
 
     except Exception as e:
         st.error(f"❌ 发生程序错误: {e}")
-        # 打印详细错误方便调试
         import traceback
         st.text(traceback.format_exc())
 
